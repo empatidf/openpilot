@@ -41,17 +41,25 @@ Steering, safety and CAN handling reuse the existing MQB Evo code; no other code
   2024 message definitions validate every checksum on recorded frames.
 - **`SMLS_01` is present** on this car. **`EA_01`/`EA_02` are not**, so the Emergency-Assist read
   is now only done when the fingerprint saw them.
-- Verified offline only: recorded frames replayed through the car interface give a valid car state
-  (gear, cruise available, steering angle, no faults). **Not yet driven with openpilot engaged.**
-- **The car's own lane-centering command is not on this CAN.** A 13-minute drive with stock
-  Travel Assist actively steering (EPS reporting `QFK_01.LatCon_HCA_Status = active`) never showed
-  `HCA_03` (0x303) or any other new message on the camera-connector bus. The camera most likely
-  steers over Automotive Ethernet. Whether the gateway/EPS accept openpilot's `HCA_03` sent on this
-  CAN is therefore **unverified until the first engagement**.
-- **Before testing openpilot steering, switch the car's own Lane Assist / Travel Assist off** in
-  the infotainment. openpilot cannot block the stock command, so both must never run at once.
-- Stock ACC, blinkers, capacitive steering-wheel touch, gear and set-speed all decode correctly
-  from the recorded drive.
+- **Steering works (first engaged drives 2026-10-09).** The EPS accepts openpilot's `HCA_03` on
+  this CAN (`QFK_01.LatCon_HCA_Status` goes to "active"), calibration completes, the learned steer
+  ratio is 15.6. Stock ACC keeps doing gas/brake.
+- The car's own lane-centering command is **not** on this CAN (the camera steers over Automotive
+  Ethernet). Keep the car's own Lane Assist / Travel Assist **off** while using openpilot so two
+  controllers never command the EPS at once.
+- Low-speed feel: the planner's desired curvature is noisy below ~40 km/h and the Superb EPS
+  executes it eagerly, which felt jerky. `master` now caps `HCA_03` power at 25 % below 25 km/h
+  (50 % from 50 km/h) and limits the per-frame curvature change at low speed. Tuning values are a
+  first guess from the logs; expect adjustments.
+- "Steering Fault May Be Imminent" in tight slow turns was the HCA watchdog reacting to your own
+  override torque (the EPS briefly drops its assist state under heavy driver torque). Fixed: flicker
+  is not counted while the driver overrides.
+- **Alpha longitudinal does not work yet — keep it off.** The radar disable itself works, but on
+  this car ECU `0x757` is the whole ADAS unit (it also carries Travel Assist, LDW and the camera
+  object messages), and the engine's ACC slave goes to permanent fault ("Cruise Fault: Restart the
+  Car") because openpilot's `ACC_18`/`ACC_19` lack GEN2-specific constants. An experimental fix
+  that mirrors the radar's constants lives on branch `superb-long` (opendbc and openpilot).
+  Untested on the car; a restart clears the fault.
 - Requires a CAN FD capable device (comma 3X / comma four) and a VW C / MFK-C camera harness.
 
 ![](https://user-images.githubusercontent.com/47793918/233812617-beab2e71-57b9-479e-8bff-c3931347ca40.png)
