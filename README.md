@@ -31,15 +31,20 @@ All car-specific changes are in the opendbc submodule, which now points to
 
 Steering, safety and CAN handling reuse the existing MQB Evo code; no other code was changed.
 
-### Known limitations
+### Status after the first installed-car logs (2026-10-09)
 
-- **The car is not identified automatically yet.** Automatic matching needs the radar firmware
-  version, which is not known. Select **"Škoda Superb 2024-25"** manually under
-  Settings → Vehicle.
-- **`MQB_EVO_GEN2` is assumed, not measured.** If the car turns out to be first-generation MQB Evo,
-  the flag must be removed.
-- Some GEN2 cars may not send the `SMLS_01` or `EA_01` messages that the code expects, which would
-  show up as a CAN error. Not yet checked on this car.
+- **Identification:** the car identifies by its radar firmware (`1N3907567B`, ECU `0x757`). The VIN
+  cannot be read from the camera connector on this car, so firmware matching is the only automatic
+  path. If it still shows "Car Unrecognized", select **"Škoda Superb 2024-25"** manually
+  (Settings → fingerprint).
+- **`MQB_EVO_GEN2` is measured, not assumed:** `ESC_51` is 64 bytes, `Motor_51` 48 bytes, and the
+  2024 message definitions validate every checksum on recorded frames.
+- **`SMLS_01` is present** on this car. **`EA_01`/`EA_02` are not**, so the Emergency-Assist read
+  is now only done when the fingerprint saw them.
+- Verified offline only: recorded frames replayed through the car interface give a valid car state
+  (gear, cruise available, steering angle, no faults). **Not yet driven with openpilot engaged.**
+- Open question: the stock camera did not send `HCA_03` (0x303) while parked. Whether it does while
+  Travel Assist steers, and whether the EPS accepts openpilot's `HCA_03`, is still unverified.
 - Requires a CAN FD capable device (comma 3X / comma four) and a VW C / MFK-C camera harness.
 
 ![](https://user-images.githubusercontent.com/47793918/233812617-beab2e71-57b9-479e-8bff-c3931347ca40.png)
