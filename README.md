@@ -47,13 +47,15 @@ Steering, safety and CAN handling reuse the existing MQB Evo code; no other code
 - The car's own lane-centering command is **not** on this CAN (the camera steers over Automotive
   Ethernet). Keep the car's own Lane Assist / Travel Assist **off** while using openpilot so two
   controllers never command the EPS at once.
-- Low-speed feel: the planner's desired curvature is noisy below ~40 km/h and the Superb EPS
-  executes it eagerly, which felt jerky. `master` now caps `HCA_03` power at 25 % below 25 km/h
-  (50 % from 50 km/h) and limits the per-frame curvature change at low speed. Tuning values are a
-  first guess from the logs; expect adjustments.
-- "Steering Fault May Be Imminent" in tight slow turns was the HCA watchdog reacting to your own
-  override torque (the EPS briefly drops its assist state under heavy driver torque). Fixed: flicker
-  is not counted while the driver overrides.
+- Steering authority: the EPS reports only ~0.80 of the commanded curvature while the car achieves
+  ~0.94, so the fork's closed-loop correction (EPS-reported − measured) cut the command by ~14 %
+  and the car ran wide in curves. The correction is disabled for MQB evo GEN2 (roll compensation
+  kept). An earlier attempt to smooth low-speed steering with power/rate caps made the car run
+  wide in tight turns and was reverted.
+- "Steering Fault May Be Imminent": the EPS reports "ready" for 2–3 frames once every second while
+  openpilot steers — exactly the watchdog's threshold. The HCA status is now debounced (50 ms).
+  On the recorded drives this removes every warning.
+- Steering power cannot exceed 50 % without changing the panda safety code (`max_steer_power`).
 - **Alpha longitudinal does not work yet — keep it off.** The radar disable itself works, but on
   this car ECU `0x757` is the whole ADAS unit (it also carries Travel Assist, LDW and the camera
   object messages), and the engine's ACC slave goes to permanent fault ("Cruise Fault: Restart the
