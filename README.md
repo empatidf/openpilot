@@ -1,5 +1,47 @@
 ## ✍ To install this fork use installer.comma.ai/empatidf/master (Comma Four compatible)
 
+## ⚠️ Untested branch — Škoda Superb Mk4 (2024+) port in progress
+
+This fork is based on [infiniteCable2/openpilot](https://github.com/infiniteCable2/openpilot) and adds
+**experimental, untested** support for the **Škoda Superb Mk4** (4th generation, 2024+, MQB Evo,
+VIN chassis code `NZ`).
+
+**It has not been driven or validated on a real car yet.** Do not rely on it. If you install it:
+
+- Keep your hands on the wheel and be ready to take over at all times.
+- Test first with the car stationary, then on an empty road — never in traffic on a first run.
+- Expect CAN errors, an "unidentified vehicle" message, or steering that does not engage.
+- Do not enable alpha longitudinal: on a camera-harness install it disables the stock radar and
+  with it the car's stock automatic emergency braking (AEB).
+
+You use this software at your own risk.
+
+### What was changed for the Superb Mk4
+
+All car-specific changes are in the opendbc submodule, which now points to
+[empatidf/opendbc](https://github.com/empatidf/opendbc) instead of infiniteCable2/opendbc:
+
+| File | Change |
+|---|---|
+| `opendbc/car/volkswagen/values.py` | New platform `SKODA_SUPERB_MK4`: MQB Evo, chassis code `NZ`, Škoda WMI `TMB`, mass 1678 kg, wheelbase 2.84 m, flag `MQB_EVO_GEN2` (2024 DBC and checksum variant) |
+| `opendbc/car/volkswagen/fingerprints.py` | Placeholder firmware entry (the car's firmware versions are not known yet) |
+| `opendbc/car/torque_data/substitute.toml` | Uses the Golf Mk8 torque values, as the Octavia Mk4 does |
+| `opendbc/car/tests/routes.py` | Listed under `non_tested_cars` (no test route yet) |
+| `opendbc/sunnypilot/car/car_list.json` | Adds "Škoda Superb 2024-25" to the vehicle selector |
+
+Steering, safety and CAN handling reuse the existing MQB Evo code; no other code was changed.
+
+### Known limitations
+
+- **The car is not identified automatically yet.** Automatic matching needs the radar firmware
+  version, which is not known. Select **"Škoda Superb 2024-25"** manually under
+  Settings → Vehicle.
+- **`MQB_EVO_GEN2` is assumed, not measured.** If the car turns out to be first-generation MQB Evo,
+  the flag must be removed.
+- Some GEN2 cars may not send the `SMLS_01` or `EA_01` messages that the code expects, which would
+  show up as a CAN error. Not yet checked on this car.
+- Requires a CAN FD capable device (comma 3X / comma four) and a VW C / MFK-C camera harness.
+
 ![](https://user-images.githubusercontent.com/47793918/233812617-beab2e71-57b9-479e-8bff-c3931347ca40.png)
 
 ## 🌞 What is sunnypilot?
