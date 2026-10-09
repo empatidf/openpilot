@@ -43,8 +43,15 @@ Steering, safety and CAN handling reuse the existing MQB Evo code; no other code
   is now only done when the fingerprint saw them.
 - Verified offline only: recorded frames replayed through the car interface give a valid car state
   (gear, cruise available, steering angle, no faults). **Not yet driven with openpilot engaged.**
-- Open question: the stock camera did not send `HCA_03` (0x303) while parked. Whether it does while
-  Travel Assist steers, and whether the EPS accepts openpilot's `HCA_03`, is still unverified.
+- **The car's own lane-centering command is not on this CAN.** A 13-minute drive with stock
+  Travel Assist actively steering (EPS reporting `QFK_01.LatCon_HCA_Status = active`) never showed
+  `HCA_03` (0x303) or any other new message on the camera-connector bus. The camera most likely
+  steers over Automotive Ethernet. Whether the gateway/EPS accept openpilot's `HCA_03` sent on this
+  CAN is therefore **unverified until the first engagement**.
+- **Before testing openpilot steering, switch the car's own Lane Assist / Travel Assist off** in
+  the infotainment. openpilot cannot block the stock command, so both must never run at once.
+- Stock ACC, blinkers, capacitive steering-wheel touch, gear and set-speed all decode correctly
+  from the recorded drive.
 - Requires a CAN FD capable device (comma 3X / comma four) and a VW C / MFK-C camera harness.
 
 ![](https://user-images.githubusercontent.com/47793918/233812617-beab2e71-57b9-479e-8bff-c3931347ca40.png)
