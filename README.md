@@ -56,6 +56,13 @@ Steering, safety and CAN handling reuse the existing MQB Evo code; no other code
   openpilot steers — exactly the watchdog's threshold. The HCA status is now debounced (50 ms).
   On the recorded drives this removes every warning.
 - Steering power cannot exceed 50 % without changing the panda safety code (`max_steer_power`).
+- **Autobahn curves / lane changes (72-minute drive analysed):** the EPS executes only ~35 % of the
+  commanded curvature above ~100 km/h (0.8–0.9 below), so curves at speed were held at ~27 % of the
+  plan and lane changes needed help. `master` now scales the curvature command by a speed-dependent
+  gain (×1.0 below 40 km/h … ×2.3 at 120 km/h and above), still bounded by the ISO lateral
+  acceleration/jerk limits in the car controller and the panda. The values are a first, deliberately
+  conservative test — the next drive's log gives the achieved/command ratio per speed band directly.
+  The command path itself was clean (50 Hz, no jumps, no warnings).
 - **Alpha longitudinal does not work yet — keep it off.** The radar disable itself works, but on
   this car ECU `0x757` is the whole ADAS unit (it also carries Travel Assist, LDW and the camera
   object messages), and the engine's ACC slave goes to permanent fault ("Cruise Fault: Restart the
