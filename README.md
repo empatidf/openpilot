@@ -48,7 +48,8 @@ mode (see the status list below).
   ratio is 15.6. Stock ACC keeps doing gas/brake.
 - The car's own lane-centering command is **not** on this CAN (the camera steers over Automotive
   Ethernet). Keep the car's own Lane Assist / Travel Assist **off** while using openpilot so two
-  controllers never command the EPS at once.
+  controllers never command the EPS at once. *(Superseded below: the EPS follows openpilot even with
+  Travel Assist engaged, and Travel Assist engaged is what stops the LKAS faults.)*
 - Steering authority: the EPS reports only ~0.80 of the commanded curvature while the car achieves
   ~0.94, so the fork's closed-loop correction (EPS-reported − measured) cut the command by ~14 %
   and the car ran wide in curves. The correction is disabled for MQB evo GEN2 (roll compensation
@@ -71,13 +72,15 @@ mode (see the status list below).
   because the camera's `TA_01` reports Travel Assist "off" (with the car's own Travel Assist active
   the release almost never happens). Every latched fault ("LKAS Fault: Restart the car") started on
   such a release while the driver held 0.6–1.2 Nm against a near-maximum power request. Changes:
-  - openpilot now sends `TA_01` itself (new safety flag `SPOOF_TA`, the camera's copy is blocked
-    by the panda) and reports Travel Assist "active" while it steers. The first drive with this
-    (2026-10-23) had no LKAS fault at all and confirmed the effect: releases dropped from 0.7/s
-    (status "ready", sent when steering without ACC) to 0.1–0.3/s (status "active"). Since then
-    "active" is sent whenever openpilot steers, with or without stock ACC, and the rest of the
-    frame is the camera's own payload. **Side effect: the cluster shows the car's own Travel
-    Assist as active while openpilot steers.**
+  - **Update after the 2026-10-23 drives (6 routes, 2505 releases, 4 latched faults): the releases depend
+    only on whether the car's *own* Travel Assist is engaged.** With it engaged the rack released 0 times
+    in 230 s of openpilot steering; without it, 0.4–1.1 times per second, whatever openpilot sends. All four
+    latched faults (including a hands-off one on a gentle 50 km/h curve, route `000000a0`) started on such a
+    release. With the car's Travel Assist engaged the car still follows openpilot's command (correlation 0.97,
+    same as without). The `TA_01` takeover had no effect and only hid the real Travel Assist state from the
+    cluster, so it is switched off again (code kept, safety flag not set).
+    **Use: engage the car's own Travel Assist (steering-wheel Travel Assist button with ACC on, cluster shows
+    the green steering-wheel icon) together with openpilot.**
   - Hand-back: while the driver presses, steering power steps down ~4× faster and reaches the
     minimum at 1.5 Nm instead of 3 Nm, so the rack is not fighting a strong request under driver
     torque.
