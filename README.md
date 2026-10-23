@@ -72,15 +72,28 @@ mode (see the status list below).
   the release almost never happens). Every latched fault ("LKAS Fault: Restart the car") started on
   such a release while the driver held 0.6–1.2 Nm against a near-maximum power request. Changes:
   - openpilot now sends `TA_01` itself (new safety flag `SPOOF_TA`, the camera's copy is blocked
-    by the panda) and reports Travel Assist "active" while it steers with stock ACC engaged.
-    **Side effect: the cluster shows the car's own Travel Assist as active while openpilot
-    steers.** Test this parked first, then on an empty road — it is the first time the car sees
-    this frame from openpilot.
+    by the panda) and reports Travel Assist "active" while it steers. The first drive with this
+    (2026-10-23) had no LKAS fault at all and confirmed the effect: releases dropped from 0.7/s
+    (status "ready", sent when steering without ACC) to 0.1–0.3/s (status "active"). Since then
+    "active" is sent whenever openpilot steers, with or without stock ACC, and the rest of the
+    frame is the camera's own payload. **Side effect: the cluster shows the car's own Travel
+    Assist as active while openpilot steers.**
   - Hand-back: while the driver presses, steering power steps down ~4× faster and reaches the
     minimum at 1.5 Nm instead of 3 Nm, so the rack is not fighting a strong request under driver
     torque.
   - The HCA-status debounce passes fault states immediately (only the 1-per-second "ready" blips
     are filtered).
+- **Car keeps right / cuts right-hand curves to the inside (drive of 2026-10-23 analysed):** the
+  car sat ~0.1–0.2 m right of the lane centre on straights, ~0.35 m inside in right-hand curves
+  and ~0.1 m inside in left-hand ones. The logs show a constant rightward curvature bias of about
+  0.0002 1/m (road crown and/or alignment): with zero steering command the car drifts right, and
+  on straights the model has to command a steady left curvature to hold the line. The feedforward
+  loop never cancels this (the fork's curvature integrator has a ~30 s time constant at 65 km/h),
+  so right curves are tracked ~10 % too strongly and left curves ~5 % too weakly. For MQB evo GEN2
+  the curvature integrator is now ~2.5 s from 43 km/h (none below 29 km/h, as before). The
+  symmetric part of the inside line (~0.2 m) is the driving model's own choice and is not changed.
+  If a residual right bias remains, the fork's **Settings → Models → Adjust Camera Offset** moves
+  the model's centre left (+ values; start with +0.05…+0.10 m) — a setting, not a code change.
 - **Low-speed wobble (below ~15 km/h):** the driving model's desired curvature carries a ~2 Hz
   dither of ~1.7° at the wheel; the command is now low-pass filtered below 30 km/h (0.2 s at
   10 km/h, off from 30 km/h). Unity gain, so tight turns still reach the planned curvature.
