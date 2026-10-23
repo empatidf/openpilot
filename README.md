@@ -29,7 +29,9 @@ All car-specific changes are in the opendbc submodule, which now points to
 | `opendbc/car/tests/routes.py` | Listed under `non_tested_cars` (no test route yet) |
 | `opendbc/sunnypilot/car/car_list.json` | Adds "Škoda Superb 2024-25" to the vehicle selector |
 
-Steering, safety and CAN handling reuse the existing MQB Evo code; no other code was changed.
+Steering, safety and CAN handling reuse the existing MQB Evo code. Later commits add Superb-specific
+tuning in `carcontroller.py`, `carstate.py`, `interface.py`, `mebcan.py` and the `volkswagen_meb` safety
+mode (see the status list below).
 
 ### Status after the first installed-car logs (2026-10-09)
 
@@ -57,12 +59,36 @@ Steering, safety and CAN handling reuse the existing MQB Evo code; no other code
   On the recorded drives this removes every warning.
 - Steering power cannot exceed 50 % without changing the panda safety code (`max_steer_power`).
 - **Autobahn curves / lane changes (72-minute drive analysed):** the EPS executes only ~35 % of the
-  commanded curvature above ~100 km/h (0.8–0.9 below), so curves at speed were held at ~27 % of the
-  plan and lane changes needed help. `master` now scales the curvature command by a speed-dependent
-  gain (×1.0 below 40 km/h … ×2.3 at 120 km/h and above), still bounded by the ISO lateral
-  acceleration/jerk limits in the car controller and the panda. The values are a first, deliberately
-  conservative test — the next drive's log gives the achieved/command ratio per speed band directly.
-  The command path itself was clean (50 Hz, no jumps, no warnings).
+  commanded curvature above ~100 km/h (0.8–0.9 at 60–100, ~1.0 in town), so curves at speed were
+  held at ~27 % of the plan and lane changes needed help. The curvature command is scaled by a
+  speed-dependent gain (×1.0 up to 60 km/h, ×1.12 at 80, ×1.2 at 95, ×2.0 at 105, ×2.3 from
+  120 km/h), still bounded by the ISO lateral acceleration/jerk limits in the car controller and the
+  panda. A first version also scaled at 40–60 km/h and made the car cut curves to the inside in town;
+  that is gone. The values are still a first test — the next drive's log gives the achieved/command
+  ratio per speed band directly.
+- **LKAS faults on sharp turns with the driver steering (five more routes analysed, 2026-10-23):**
+  the rack releases HCA for 1–2 frames once every second while openpilot steers, and it does so
+  because the camera's `TA_01` reports Travel Assist "off" (with the car's own Travel Assist active
+  the release almost never happens). Every latched fault ("LKAS Fault: Restart the car") started on
+  such a release while the driver held 0.6–1.2 Nm against a near-maximum power request. Changes:
+  - openpilot now sends `TA_01` itself (new safety flag `SPOOF_TA`, the camera's copy is blocked
+    by the panda) and reports Travel Assist "active" while it steers with stock ACC engaged.
+    **Side effect: the cluster shows the car's own Travel Assist as active while openpilot
+    steers.** Test this parked first, then on an empty road — it is the first time the car sees
+    this frame from openpilot.
+  - Hand-back: while the driver presses, steering power steps down ~4× faster and reaches the
+    minimum at 1.5 Nm instead of 3 Nm, so the rack is not fighting a strong request under driver
+    torque.
+  - The HCA-status debounce passes fault states immediately (only the 1-per-second "ready" blips
+    are filtered).
+- **Low-speed wobble (below ~15 km/h):** the driving model's desired curvature carries a ~2 Hz
+  dither of ~1.7° at the wheel; the command is now low-pass filtered below 30 km/h (0.2 s at
+  10 km/h, off from 30 km/h). Unity gain, so tight turns still reach the planned curvature.
+- **Car errors at some ignitions (open):** on the camera-side bus the panda accumulates 100–200
+  bus-off recoveries per ignition cycle, all outside the logged drive (the counter never moves while
+  driving; the car-side bus has none). The exact window cannot be seen in the logs. Not changed in
+  this fork yet — note what the cluster shows and when (before or after the comma screen shows the
+  road) on the next occurrence.
 - **Alpha longitudinal does not work yet — keep it off.** The radar disable itself works, but on
   this car ECU `0x757` is the whole ADAS unit (it also carries Travel Assist, LDW and the camera
   object messages), and the engine's ACC slave goes to permanent fault ("Cruise Fault: Restart the
