@@ -81,11 +81,18 @@ mode (see the status list below).
     cluster, so it is switched off again (code kept, safety flag not set).
     **Use: engage the car's own Travel Assist (steering-wheel Travel Assist button with ACC on, cluster shows
     the green steering-wheel icon) together with openpilot.**
-  - Hand-back: while the driver presses, steering power steps down ~4× faster and reaches the
-    minimum at 1.5 Nm instead of 3 Nm, so the rack is not fighting a strong request under driver
-    torque.
+  - Hand-back: a faster power step-down under driver torque was tried and is reverted (see below).
   - The HCA-status debounce passes fault states immediately (only the 1-per-second "ready" blips
     are filtered).
+- **Wheel let go / LKAS fault in city curves (routes `000000a3`, `000000a4`, 2026-10-25):** every latched
+  fault so far (6 of ~2900 rack releases) started on the rack's own once-per-second release while openpilot
+  held full power with no hands on the wheel, at a commanded lateral acceleration of 1.26–1.84 m/s²; none of
+  the 2752 releases below 1.25 m/s² faulted. Three of this fork's earlier changes act at town speed and are
+  now back to the original behaviour: the closed-loop EPS correction is used again below 50 km/h (faded out
+  by 60 km/h, where the speed-dependent gain takes over), the faster hand-back is reverted (it dropped power
+  to ~15 % with a resting hand and felt like the wheel letting go), and the low-speed filter is off. On the
+  two fault moments the command is 7–11 % lower (≈1.2 m/s²). The rack release itself still only stops when
+  the car's own Travel Assist is engaged (needs ACC on).
 - **Car keeps right / cuts right-hand curves to the inside (drive of 2026-10-23 analysed):** the
   car sat ~0.1–0.2 m right of the lane centre on straights, ~0.35 m inside in right-hand curves
   and ~0.1 m inside in left-hand ones. The logs show a constant rightward curvature bias of about
@@ -98,8 +105,7 @@ mode (see the status list below).
   If a residual right bias remains, the fork's **Settings → Models → Adjust Camera Offset** moves
   the model's centre left (+ values; start with +0.05…+0.10 m) — a setting, not a code change.
 - **Low-speed wobble (below ~15 km/h):** the driving model's desired curvature carries a ~2 Hz
-  dither of ~1.7° at the wheel; the command is now low-pass filtered below 30 km/h (0.2 s at
-  10 km/h, off from 30 km/h). Unity gain, so tight turns still reach the planned curvature.
+  dither of ~1.7° at the wheel. A low-pass filter below 30 km/h was tried and is off again.
 - **Car errors at some ignitions (open):** on the camera-side bus the panda accumulates 100–200
   bus-off recoveries per ignition cycle, all outside the logged drive (the counter never moves while
   driving; the car-side bus has none). The exact window cannot be seen in the logs. Not changed in
