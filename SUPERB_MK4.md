@@ -20,6 +20,20 @@ commaai/opendbc master plus a single commit adding the Škoda Superb Mk4 (MQB Ev
   Travel Assist is engaged; rarely this latches "LKAS Fault" in a loaded curve. Engaging the car's
   Travel Assist together with ACC avoids it.
 
+## Branch `op-superb-fix` (test build, 2026-10-30)
+Made from drives `0000002f` and `00000032`:
+- **Stop-and-go "Cruise Fault":** the radar's `AWV_Unavailable` bit flickers for 0.1-2 s during
+  Front Assist warning phases in dense traffic; openpilot treated it as a fault, disengaged and
+  cancelled ACC. It now has to persist for 5 s.
+- **Highway left-right weave:** the curvature controller's P gain is a third of the MEB value
+  (it amplified wheel-angle sensor steps); the P/I error uses the plan from one steering delay ago.
+- **Lane changes:** a wheel nudge no longer resets the learned steering bias (integrator); the
+  integrator is frozen during lane changes and bounded to 1 m/s^2.
+- Still open: during each lane change the car's Travel Assist pauses for ~3-8 s and the rack
+  releases briefly once per second in that window.
+
+Install the test build: `installer.comma.ai/empatidf/op-superb-fix`
+
 ## Install
 `installer.comma.ai/empatidf/op`
 

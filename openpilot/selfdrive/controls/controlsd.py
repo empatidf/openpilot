@@ -109,6 +109,11 @@ class Controls:
       CC.leftBlinker = model_v2.meta.laneChangeDirection == LaneChangeDirection.left
       CC.rightBlinker = model_v2.meta.laneChangeDirection == LaneChangeDirection.right
 
+    # hold the curvature integrator through lane changes (see LatControlCurvature.hold_integrator)
+    if isinstance(self.LaC, LatControlCurvature):
+      self.LaC.hold_integrator = model_v2.meta.laneChangeState in (LaneChangeState.laneChangeStarting,
+                                                                   LaneChangeState.laneChangeFinishing)
+
     if not CC.latActive:
       self.LaC.reset()
     if not CC.longActive:
