@@ -32,6 +32,17 @@ Made from drives `0000002f` and `00000032`:
 - Still open: during each lane change the car's Travel Assist pauses for ~3-8 s and the rack
   releases briefly once per second in that window.
 
+## Changes 2026-10-30 (drive 00000044)
+- **Slow lane changes:** the smoothing filter ran after the jerk limit and cut the steering rate
+  to a fifth; it now runs before it.
+- **Wheel vibration in curves:** with the car's Travel Assist active, the rack follows the camera's
+  own lane centering and only a few percent of openpilot's corrections. openpilot's integrator
+  wound up against it (up to 20e-4 1/m) and the two requests fought (~10 Hz vibration). The
+  integrator is now frozen and bled off while Travel Assist is active
+  (`CarState.lateralStockAssistActive`).
+- Important: **with Travel Assist active, the car's own Travel Assist does most of the steering**;
+  openpilot mainly steers when Travel Assist is off or paused (e.g. lane changes).
+
 ## Install
 `installer.comma.ai/empatidf/op`
 

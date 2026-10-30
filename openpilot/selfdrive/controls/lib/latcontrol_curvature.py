@@ -9,6 +9,7 @@ from openpilot.selfdrive.controls.lib.drive_helpers import MAX_CURVATURE
 
 LAT_ACCEL_SATURATION_THRESHOLD = 0.5  # m/s^2
 VW_INTEGRATOR_MAX_LAT_ACCEL = 1.0  # m/s^2
+VW_INTEGRATOR_BLEED_TIME = 2.0  # s
 
 
 class LatControlCurvature(LatControl):
@@ -50,14 +51,20 @@ class LatControlCurvature(LatControl):
         self.pid.reset()
     elif self.pid is not None and self.vw_feedback:
       # A wheel nudge (e.g. confirming a lane change) used to reset the PID, dropping the integrator that holds the
-      # car's steady steering bias (up to ~6e-4 1/m at highway speed on the Superb Mk4) and pushing the car off centre
-      # for seconds afterwards. Keep it, without P, during overrides; freeze it while steering is overridden, lane
-      # changing or limited by safety, so it does not wind up on errors the controller is not meant to remove.
+      # car's steady steering bias and pushing the car off centre for seconds afterwards. Keep it, without P, during
+      # overrides; freeze it while steering is overridden, lane changing or limited by safety, so it does not wind up
+      # on errors the controller is not meant to remove.
       freeze = CS.steeringPressed or self.hold_integrator or steer_limited_by_safety or CS.vEgo < 5.
+      if CS.lateralStockAssistActive:
+        # The car's own lane centering is steering (VW Travel Assist): the rack acts on only a few percent of our
+        # deviations from the plan, so an integrator would wind up against it (Superb Mk4: up to 20e-4 1/m, felt as a
+        # ~10 Hz wheel vibration in curves) and kick in when Travel Assist pauses for a lane change. Bleed it off.
+        freeze = True
+        self.pid.i *= 1. - self.dt / VW_INTEGRATOR_BLEED_TIME
       vw_error = 0. if CS.steeringPressed else expected_curvature - actual_curvature
       output_curvature = self.pid.update(vw_error, speed=CS.vEgo, feedforward=self.kf * desired_curvature,
                                          freeze_integrator=freeze)
-      # bound the kept integrator to 1 m/s^2 of lateral acceleration (steady bias seen: ~0.6 m/s^2)
+      # bound the kept integrator to 1 m/s^2 of lateral acceleration
       i_max = VW_INTEGRATOR_MAX_LAT_ACCEL / max(CS.vEgo, 5.) ** 2
       if abs(self.pid.i) > i_max:
         self.pid.i = float(np.clip(self.pid.i, -i_max, i_max))
