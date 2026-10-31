@@ -62,3 +62,9 @@ git push origin HEAD:op --force-with-lease
 # 3. openpilot: point at the rebased opendbc commit
 cd .. && git add opendbc_repo && git commit -m "bump opendbc (Superb Mk4)" && git push origin op
 ```
+
+## Changes 2026-10-31 (drive 0000004a)
+- **Rare disengagement at standstill:** openpilot sent a second copy of the steering wheel's
+  `KLR_01` (hands-on) message on the car side, on its own clock. When it collided with the car's
+  own frame, the frame was lost and the stock ACC shut off with a reversible fault. MQB Evo now
+  sends `KLR_01` only on the camera side.
