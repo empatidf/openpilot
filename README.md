@@ -1,195 +1,79 @@
-## ✍ To install this fork use installer.comma.ai/empatidf/master (Comma Four compatible)
+# openpilot for the Škoda Superb Mk4 (2024+, MQB Evo)
 
-## ⚠️ Untested branch — Škoda Superb Mk4 (2024+) port in progress
+Steering support for the **Škoda Superb Mk4** (4th generation, 2024+, MQB Evo GEN2, chassis code `NZ`)
+on a comma device. openpilot steers; the car's own ACC keeps gas, brake and emergency braking.
 
-This fork is based on [infiniteCable2/openpilot](https://github.com/infiniteCable2/openpilot) and adds
-**experimental, untested** support for the **Škoda Superb Mk4** (4th generation, 2024+, MQB Evo,
-VIN chassis code `NZ`).
+> **Experimental, not supported or reviewed by comma.ai.** Keep your hands on the wheel and be ready to
+> take over at any time. You use this software at your own risk.
 
-**It has not been driven or validated on a real car yet.** Do not rely on it. If you install it:
+## Which branch to install
 
-- Keep your hands on the wheel and be ready to take over at all times.
-- Test first with the car stationary, then on an empty road — never in traffic on a first run.
-- Expect CAN errors, an "unidentified vehicle" message, or steering that does not engage.
-- Do not enable alpha longitudinal: on a camera-harness install it disables the stock radar and
-  with it the car's stock automatic emergency braking (AEB).
+| Branch | What it is | Install |
+|---|---|---|
+| **`op`** (use this) | comma.ai openpilot 0.11.3 with the Superb Mk4 port in [empatidf/opendbc](https://github.com/empatidf/opendbc) branch `op` | `installer.comma.ai/empatidf/op` |
+| `master` | Earlier port on a sunnypilot base. No longer the active branch; kept for reference | — |
+| `superb-long` | Experimental openpilot longitudinal attempt. **Do not use** (see open issues) | — |
+| `op-superb-fix` | Old test branch, merged into `op`. Can be deleted | — |
 
-You use this software at your own risk.
+The current `op` build has the same code as `4210b83`, the build confirmed on the car as the best working
+steering so far. Its parameters and the reasons behind them are in `SUPERB_MK4_BEST_LATERAL.md` on the
+`op` branch (search for `BEST WORKING LATERAL MODEL`); `SUPERB_MK4.md` there lists every change.
 
-### What was changed for the Superb Mk4
+## Requirements
 
-All car-specific changes are in the opendbc submodule, which now points to
-[empatidf/opendbc](https://github.com/empatidf/opendbc) instead of infiniteCable2/opendbc:
+- comma four or comma 3X (the car uses CAN FD).
+- VW C / MFK-C camera harness at the windscreen camera.
+- The car is identified by its radar firmware (`1N3907567B`, ECU `0x757`); the VIN cannot be read from the
+  camera connector.
 
-| File | Change |
-|---|---|
-| `opendbc/car/volkswagen/values.py` | New platform `SKODA_SUPERB_MK4`: MQB Evo, chassis code `NZ`, Škoda WMI `TMB`, mass 1678 kg, wheelbase 2.84 m, flag `MQB_EVO_GEN2` (2024 DBC and checksum variant) |
-| `opendbc/car/volkswagen/fingerprints.py` | Placeholder firmware entry (the car's firmware versions are not known yet) |
-| `opendbc/car/torque_data/substitute.toml` | Uses the Golf Mk8 torque values, as the Octavia Mk4 does |
-| `opendbc/car/tests/routes.py` | Listed under `non_tested_cars` (no test route yet) |
-| `opendbc/sunnypilot/car/car_list.json` | Adds "Škoda Superb 2024-25" to the vehicle selector |
+## How to drive with it
 
-Steering, safety and CAN handling reuse the existing MQB Evo code. Later commits add Superb-specific
-tuning in `carcontroller.py`, `carstate.py`, `interface.py`, `mebcan.py` and the `volkswagen_meb` safety
-mode (see the status list below).
+1. Turn on the car's ACC and engage the car's own **Travel Assist** (steering-wheel button, green
+   steering-wheel icon in the cluster). openpilot engages together with ACC.
+2. With Travel Assist engaged the steering rack does not release once per second, and the "LKAS Fault"
+   seen in earlier versions has not occurred in the logged drives.
+3. Lane changes: signal and nudge the wheel; openpilot changes lane.
 
-### Status after the first installed-car logs (2026-10-09)
+## What the port does
 
-- **Identification:** the car identifies by its radar firmware (`1N3907567B`, ECU `0x757`). The VIN
-  cannot be read from the camera connector on this car, so firmware matching is the only automatic
-  path. If it still shows "Car Unrecognized", select **"Škoda Superb 2024-25"** manually
-  (Settings → fingerprint).
-- **`MQB_EVO_GEN2` is measured, not assumed:** `ESC_51` is 64 bytes, `Motor_51` 48 bytes, and the
-  2024 message definitions validate every checksum on recorded frames.
-- **`SMLS_01` is present** on this car. **`EA_01`/`EA_02` are not**, so the Emergency-Assist read
-  is now only done when the fingerprint saw them.
-- **Steering works (first engaged drives 2026-10-09).** The EPS accepts openpilot's `HCA_03` on
-  this CAN (`QFK_01.LatCon_HCA_Status` goes to "active"), calibration completes, the learned steer
-  ratio is 15.6. Stock ACC keeps doing gas/brake.
-- The car's own lane-centering command is **not** on this CAN (the camera steers over Automotive
-  Ethernet). Keep the car's own Lane Assist / Travel Assist **off** while using openpilot so two
-  controllers never command the EPS at once. *(Superseded below: the EPS follows openpilot even with
-  Travel Assist engaged, and Travel Assist engaged is what stops the LKAS faults.)*
-- Steering authority: the EPS reports only ~0.80 of the commanded curvature while the car achieves
-  ~0.94, so the fork's closed-loop correction (EPS-reported − measured) cut the command by ~14 %
-  and the car ran wide in curves. The correction is disabled for MQB evo GEN2 (roll compensation
-  kept). An earlier attempt to smooth low-speed steering with power/rate caps made the car run
-  wide in tight turns and was reverted.
-- "Steering Fault May Be Imminent": the EPS reports "ready" for 2–3 frames once every second while
-  openpilot steers — exactly the watchdog's threshold. The HCA status is now debounced (50 ms).
-  On the recorded drives this removes every warning.
-- Steering power cannot exceed 50 % without changing the panda safety code (`max_steer_power`).
-- **Autobahn curves / lane changes (72-minute drive analysed):** the EPS executes only ~35 % of the
-  commanded curvature above ~100 km/h (0.8–0.9 at 60–100, ~1.0 in town), so curves at speed were
-  held at ~27 % of the plan and lane changes needed help. The curvature command is scaled by a
-  speed-dependent gain (×1.0 up to 60 km/h, ×1.12 at 80, ×1.2 at 95, ×2.0 at 105, ×2.3 from
-  120 km/h), still bounded by the ISO lateral acceleration/jerk limits in the car controller and the
-  panda. A first version also scaled at 40–60 km/h and made the car cut curves to the inside in town;
-  that is gone. The values are still a first test — the next drive's log gives the achieved/command
-  ratio per speed band directly.
-- **LKAS faults on sharp turns with the driver steering (five more routes analysed, 2026-10-23):**
-  the rack releases HCA for 1–2 frames once every second while openpilot steers, and it does so
-  because the camera's `TA_01` reports Travel Assist "off" (with the car's own Travel Assist active
-  the release almost never happens). Every latched fault ("LKAS Fault: Restart the car") started on
-  such a release while the driver held 0.6–1.2 Nm against a near-maximum power request. Changes:
-  - **Update after the 2026-10-23 drives (6 routes, 2505 releases, 4 latched faults): the releases depend
-    only on whether the car's *own* Travel Assist is engaged.** With it engaged the rack released 0 times
-    in 230 s of openpilot steering; without it, 0.4–1.1 times per second, whatever openpilot sends. All four
-    latched faults (including a hands-off one on a gentle 50 km/h curve, route `000000a0`) started on such a
-    release. With the car's Travel Assist engaged the car still follows openpilot's command (correlation 0.97,
-    same as without). The `TA_01` takeover had no effect and only hid the real Travel Assist state from the
-    cluster, so it is switched off again (code kept, safety flag not set).
-    **Use: engage the car's own Travel Assist (steering-wheel Travel Assist button with ACC on, cluster shows
-    the green steering-wheel icon) together with openpilot.**
-  - Hand-back: a faster power step-down under driver torque was tried and is reverted (see below).
-  - The HCA-status debounce passes fault states immediately (only the 1-per-second "ready" blips
-    are filtered).
-- **Wheel let go / LKAS fault in city curves (routes `000000a3`, `000000a4`, 2026-10-25):** every latched
-  fault so far (6 of ~2900 rack releases) started on the rack's own once-per-second release while openpilot
-  held full power with no hands on the wheel, at a commanded lateral acceleration of 1.26–1.84 m/s²; none of
-  the 2752 releases below 1.25 m/s² faulted. Three of this fork's earlier changes act at town speed and are
-  now back to the original behaviour: the closed-loop EPS correction is used again below 50 km/h (faded out
-  by 60 km/h, where the speed-dependent gain takes over), the faster hand-back is reverted (it dropped power
-  to ~15 % with a resting hand and felt like the wheel letting go), and the low-speed filter is off. On the
-  two fault moments the command is 7–11 % lower (≈1.2 m/s²). The rack release itself still only stops when
-  the car's own Travel Assist is engaged (needs ACC on).
-- **Car keeps right / cuts right-hand curves to the inside (drive of 2026-10-23 analysed):** the
-  car sat ~0.1–0.2 m right of the lane centre on straights, ~0.35 m inside in right-hand curves
-  and ~0.1 m inside in left-hand ones. The logs show a constant rightward curvature bias of about
-  0.0002 1/m (road crown and/or alignment): with zero steering command the car drifts right, and
-  on straights the model has to command a steady left curvature to hold the line. The feedforward
-  loop never cancels this (the fork's curvature integrator has a ~30 s time constant at 65 km/h),
-  so right curves are tracked ~10 % too strongly and left curves ~5 % too weakly. For MQB evo GEN2
-  the curvature integrator is now ~2.5 s from 43 km/h (none below 29 km/h, as before). The
-  symmetric part of the inside line (~0.2 m) is the driving model's own choice and is not changed.
-  If a residual right bias remains, the fork's **Settings → Models → Adjust Camera Offset** moves
-  the model's centre left (+ values; start with +0.05…+0.10 m) — a setting, not a code change.
-- **Low-speed wobble (below ~15 km/h):** the driving model's desired curvature carries a ~2 Hz
-  dither of ~1.7° at the wheel. A low-pass filter below 30 km/h was tried and is off again.
-- **Car errors at some ignitions (open):** on the camera-side bus the panda accumulates 100–200
-  bus-off recoveries per ignition cycle, all outside the logged drive (the counter never moves while
-  driving; the car-side bus has none). The exact window cannot be seen in the logs. Not changed in
-  this fork yet — note what the cluster shows and when (before or after the comma screen shows the
-  road) on the next occurrence.
-- **Alpha longitudinal does not work yet — keep it off.** The radar disable itself works, but on
-  this car ECU `0x757` is the whole ADAS unit (it also carries Travel Assist, LDW and the camera
-  object messages), and the engine's ACC slave goes to permanent fault ("Cruise Fault: Restart the
-  Car") because openpilot's `ACC_18`/`ACC_19` lack GEN2-specific constants. An experimental fix
-  that mirrors the radar's constants lives on branch `superb-long` (opendbc and openpilot).
-  Untested on the car; a restart clears the fault.
-- Requires a CAN FD capable device (comma 3X / comma four) and a VW C / MFK-C camera harness.
+- Steering by curvature (`HCA_03`), with tuning measured on this car over ~20 logged drives:
+  - speed-dependent gain on the command (the rack carries out less of the command above ~100 km/h),
+  - a smoothed command at speed, filtered before the legal acceleration/jerk limits,
+  - a gentle feedback controller (low proportional gain against highway weave; an integrator that is kept
+    through wheel nudges, frozen during lane changes and bled off while Travel Assist steers).
+- Stock ACC stays in charge of speed. Short Front Assist warning phases in dense traffic
+  (`AWV_03.AWV_Unavailable` for 0.1–2 s) no longer count as a cruise fault.
 
-![](https://user-images.githubusercontent.com/47793918/233812617-beab2e71-57b9-479e-8bff-c3931347ca40.png)
+## Open issues
 
-## 🌞 What is sunnypilot?
-[sunnypilot](https://github.com/sunnyhaibin/sunnypilot) is a fork of comma.ai's openpilot, an open source driver assistance system. sunnypilot offers the user a unique driving experience for over 300+ supported car makes and models with modified behaviors of driving assist engagements. sunnypilot complies with comma.ai's safety rules as accurately as possible.
+- **Rack releases once per second without Travel Assist.** When the car's Travel Assist is not engaged,
+  the rack drops openpilot's steering request for 10–20 ms every second (felt as a small ping). Under load
+  with the driver steering, such a release can end in "LKAS Fault: Restart the Car". This also happens
+  during lane changes, because Travel Assist pauses for about 3–8 s when you signal.
+- **With Travel Assist engaged, the car's own lane centering does most of the steering.** The rack follows
+  only a small part of openpilot's corrections; openpilot steers alone when Travel Assist pauses, e.g.
+  during lane changes.
+- **Rare stock-ACC shut-off at standstill.** Once in a while the car's ACC switches itself off after a few
+  seconds at a stop (reversible fault with a warning sound) and openpilot disengages with it. The likely
+  cause is openpilot's second copy of the steering wheel's hands-on message (`KLR_01`) colliding with the
+  car's own frame on the car-side bus. A fix was tested and is reverted for now, because the build without
+  it drove more reliably; still under investigation.
+- **Car errors at some ignitions.** On some start-ups the car shows several assistance-system errors. The
+  panda's camera-side bus records bus-off errors around ignition on/off, never while driving. Not solved.
+- **Small steering-wheel dither below ~15 km/h** comes from the driving model's plan; a fine 10–17 Hz buzz
+  felt in some curves is generated inside the rack.
+- **No openpilot longitudinal control.** The radar sits on the car-side bus, outside the camera harness, so
+  its acceleration requests cannot be replaced without silencing the whole ADAS unit (which also removes
+  emergency braking and Travel Assist). A gateway (J533) harness could make it possible; not tried.
 
-## 💭 Join our Community Forum
-Join the official sunnypilot community forum to stay up to date with all the latest features and be a part of shaping the future of sunnypilot!
-* https://community.sunnypilot.ai/
+## License
 
-## Documentation
-https://docs.sunnypilot.ai/ is your one stop shop for everything from features to installation to FAQ about the sunnypilot
+openpilot is released under the MIT license; see [`LICENSE`](LICENSE). Any user of this software shall
+indemnify and hold harmless Comma.ai, Inc. and its directors, officers, employees, agents, stockholders,
+affiliates, subcontractors and customers from and against all allegations, claims, actions, suits, demands,
+damages, liabilities, obligations, losses, settlements, judgments, costs and expenses (including without
+limitation attorneys' fees and costs) which arise out of, relate to or result from any use of this software
+by user.
 
-## 🚘 Running on a dedicated device in a car
-First, check out this list of items you'll need to [get started](https://community.sunnypilot.ai/t/getting-started-using-sunnypilot-in-your-supported-car/251).
-
-## Installation
-Next, refer to the sunnypilot community forum for [installation instructions](https://community.sunnypilot.ai/t/read-before-installing-sunnypilot/254), as well as a complete list of [Recommended Branch Installations](https://community.sunnypilot.ai/t/recommended-branch-installations/235).
-
-## 🎆 Pull Requests
-We welcome both pull requests and issues on GitHub. Bug fixes are encouraged.
-
-Pull requests should be against the most current `master` branch.
-
-## 📊 User Data
-
-By default, sunnypilot uploads the driving data to comma servers. You can also access your data through [comma connect](https://connect.comma.ai/).
-
-sunnypilot is open source software. The user is free to disable data collection if they wish to do so.
-
-sunnypilot logs the road-facing camera, CAN, GPS, IMU, magnetometer, thermal sensors, crashes, and operating system logs.
-The driver-facing camera and microphone are only logged if you explicitly opt-in in settings.
-
-By using this software, you understand that use of this software or its related services will generate certain types of user data, which may be logged and stored at the sole discretion of comma. By accepting this agreement, you grant an irrevocable, perpetual, worldwide right to comma for the use of this data.
-
-## Licensing
-
-sunnypilot is released under the [MIT License](LICENSE). This repository includes original work as well as significant portions of code derived from [openpilot by comma.ai](https://github.com/commaai/openpilot), which is also released under the MIT license with additional disclaimers.
-
-The original openpilot license notice, including comma.ai’s indemnification and alpha software disclaimer, is reproduced below as required:
-
-> openpilot is released under the MIT license. Some parts of the software are released under other licenses as specified.
->
-> Any user of this software shall indemnify and hold harmless Comma.ai, Inc. and its directors, officers, employees, agents, stockholders, affiliates, subcontractors and customers from and against all allegations, claims, actions, suits, demands, damages, liabilities, obligations, losses, settlements, judgments, costs and expenses (including without limitation attorneys’ fees and costs) which arise out of, relate to or result from any use of this software by user.
->
-> **THIS IS ALPHA QUALITY SOFTWARE FOR RESEARCH PURPOSES ONLY. THIS IS NOT A PRODUCT.
-> YOU ARE RESPONSIBLE FOR COMPLYING WITH LOCAL LAWS AND REGULATIONS.
-> NO WARRANTY EXPRESSED OR IMPLIED.**
-
-For full license terms, please see the [`LICENSE`](LICENSE) file.
-
-## 💰 Support sunnypilot
-If you find any of the features useful, consider becoming a [sponsor on GitHub](https://github.com/sponsors/sunnyhaibin) to support future feature development and improvements.
-
-
-By becoming a sponsor, you will gain access to exclusive content, early access to new features, and the opportunity to directly influence the project's development.
-
-
-<h3>GitHub Sponsor</h3>
-
-<a href="https://github.com/sponsors/sunnyhaibin">
-  <img src="https://user-images.githubusercontent.com/47793918/244135584-9800acbd-69fd-4b2b-bec9-e5fa2d85c817.png" alt="Become a Sponsor" width="300" style="max-width: 100%; height: auto;">
-</a>
-<br>
-
-<h3>PayPal</h3>
-
-<a href="https://paypal.me/sunnyhaibin0850" target="_blank">
-<img src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" alt="PayPal this" title="PayPal - The safer, easier way to pay online!" border="0" />
-</a>
-<br></br>
-
-Your continuous love and support are greatly appreciated! Enjoy 🥰
-
-<span>-</span> Jason, Founder of sunnypilot
+**THIS IS ALPHA QUALITY SOFTWARE FOR RESEARCH PURPOSES ONLY. THIS IS NOT A PRODUCT. YOU ARE RESPONSIBLE FOR
+COMPLYING WITH LOCAL LAWS AND REGULATIONS. NO WARRANTY EXPRESSED OR IMPLIED.**
