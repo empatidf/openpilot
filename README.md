@@ -111,9 +111,18 @@ Notes:
 
 ## Open issues
 
-- **Keeps too close to the right lane line in town.** Cause not found yet.
-- **Short opposite-direction steering pulses in turns, at a regular rhythm.** Source not found yet; it is
-  most likely the car itself (the rack's once-per-second release), but the logs have not confirmed it.
+- **Keeps too close to the right lane line.** With the car's Travel Assist active, the car's own lane
+  centering decides where the car sits in the lane and keeps a position the driver steered to (0.5 m right
+  of centre for 75 s after a 4 s push on the wheel); openpilot's sustained requests are not executed. On
+  unmarked town roads the driving model itself keeps to the right and takes right-hand bends close to the kerb.
+- **Short opposite-direction steering pulses in turns, once a second.** With Travel Assist not active the
+  rack ends each steering request after exactly 1.00 s and accepts it again one frame later, a 1.5 Nm jolt
+  in turns.
+- **Why neither is fixed.** Both come from the camera on a path the camera harness does not carry: the
+  once-a-second timing restarts whenever the camera's Travel Assist leaves the active state, also while
+  openpilot told the car that Travel Assist was active (tried on the `chestnut-ta` branch, without effect).
+  On the bus the harness intercepts, the camera never sends the steering message `HCA_03`. A fix needs the
+  camera's second connection to be found and interrupted in hardware.
 - **Sensors drop out briefly and openpilot disengages.** The car's assistance sensors go away for a moment,
   openpilot switches off, the sensors come back right after and openpilot can be engaged again. Not fixed;
   it is linked to a timing clash of CAN messages (openpilot's copy of the steering wheel's hands-on message
@@ -127,6 +136,8 @@ Notes:
 
 - With Travel Assist engaged, the car's own lane centering does most of the steering; openpilot steers alone
   when Travel Assist pauses, e.g. during lane changes (Travel Assist pauses for about 3–8 s when you signal).
+- When you steer, openpilot follows your steering and hands back over one second after you let go (not during
+  lane changes, where the nudge on the wheel starts the change).
 - No openpilot longitudinal control: the radar sits on the car-side bus, outside the camera harness, so its
   acceleration requests cannot be replaced without silencing the whole ADAS unit (which also removes
   emergency braking and Travel Assist).
