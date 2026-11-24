@@ -10,9 +10,10 @@ Keywords: best-lateral, best working lateral model, superb-mk4, mqb-evo, referen
 Confirmed on the car by the owner as one of the best working lateral steering
 builds so far. Use this tag as the reference point to compare or roll back to.
 
-  openpilot  empatidf/openpilot  op  4210b83  (comma openpilot 0.11.3 base)
-  opendbc    empatidf/opendbc    op  7251ca3f
-  Install:   installer.comma.ai/empatidf/op  (or check out this tag)
+  openpilot  empatidf/openpilot  4210b83  (comma openpilot 0.11.3 base)
+  opendbc    empatidf/opendbc    7251ca3f
+  Branch:    master (called op until 2026-11)
+  Install:   installer.comma.ai/empatidf/master
 
 CAR SETUP
 - Skoda Superb Mk4 (chassis NZ, 2024+), MQB Evo GEN2, CAN FD, camera harness

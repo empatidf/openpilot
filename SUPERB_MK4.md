@@ -1,10 +1,11 @@
-# Škoda Superb Mk4 on stock openpilot (branch `op`)
+# Škoda Superb Mk4 on stock openpilot (branch `master`)
 
-This branch is **comma.ai openpilot master, unchanged**, with one difference: the `opendbc`
-submodule points at [empatidf/opendbc](https://github.com/empatidf/opendbc) branch `op`, which is
-commaai/opendbc master plus a single commit adding the Škoda Superb Mk4 (MQB Evo, 2024+).
+This branch is **comma.ai openpilot** with the Škoda Superb Mk4 (MQB Evo, 2024+) port: the `opendbc`
+submodule points at [empatidf/opendbc](https://github.com/empatidf/opendbc) branch `master` (comma.ai opendbc
+plus the Superb Mk4 commits), and `openpilot/selfdrive/controls` carries the Volkswagen curvature-controller
+changes listed below. (Until 2026-11 this branch was called `op`.)
 
-> **Untested on the car.** Not supported or reviewed by comma.ai. Use at your own risk, keep your
+> **Experimental.** Not supported or reviewed by comma.ai. Use at your own risk, keep your
 > hands on the wheel and be ready to take over at any time.
 
 ## What the car port does
@@ -44,7 +45,7 @@ Made from drives `0000002f` and `00000032`:
   openpilot mainly steers when Travel Assist is off or paused (e.g. lane changes).
 
 ## Install
-`installer.comma.ai/empatidf/op`
+`installer.comma.ai/empatidf/master`
 
 ## Updating to newer openpilot
 ```sh
@@ -53,12 +54,13 @@ git fetch https://github.com/commaai/openpilot.git master
 NEW_DBC=$(git ls-tree FETCH_HEAD opendbc_repo | awk '{print $3}')   # opendbc commit comma pins
 git merge FETCH_HEAD            # conflicts only possible in .gitmodules / opendbc_repo: keep ours
 
-# 2. opendbc: replay the single Superb commit onto the opendbc commit comma pins
+# 2. opendbc: merge the opendbc commit comma pins into our master (merge, never rebase or force-push:
+#    devices fetch every submodule commit referenced in the history, so old ones must stay reachable)
 cd opendbc_repo
 git fetch https://github.com/commaai/opendbc.git master
-git rebase $NEW_DBC
-git push origin HEAD:op --force-with-lease
+git merge $NEW_DBC
+git push origin HEAD:master
 
 # 3. openpilot: point at the rebased opendbc commit
-cd .. && git add opendbc_repo && git commit -m "bump opendbc (Superb Mk4)" && git push origin op
+cd .. && git add opendbc_repo && git commit -m "bump opendbc (Superb Mk4)" && git push origin master
 ```
