@@ -5,8 +5,16 @@
 > comma.ai openpilot: install it with `installer.comma.ai/empatidf/master`.
 
 This branch is the first port of the **Škoda Superb Mk4** (2024+, MQB Evo GEN2, chassis code `NZ`), built on
-[sunnypilot](https://github.com/sunnypilot/sunnypilot). Its car code is in
-[empatidf/opendbc](https://github.com/empatidf/opendbc) branch `sunnypilot`. The findings from its test drives
+[sunnypilot](https://github.com/sunnypilot/sunnypilot).
+
+**Where the code comes from:** this branch continues
+[infiniteCable2/openpilot](https://github.com/infiniteCable2/openpilot) (a sunnypilot-based fork with MEB and
+MQB Evo support). Its car code is in [empatidf/opendbc](https://github.com/empatidf/opendbc) branch
+`sunnypilot`, which **is taken from [infiniteCable2/opendbc](https://github.com/infiniteCable2/opendbc)** (MQB
+Evo message definitions, MEB/MQB Evo control and safety code) with the Superb Mk4 platform and its tuning added
+on top.
+
+The findings from its test drives
 (the rack's once-per-second release without the car's Travel Assist, the speed-dependent curvature gain, the
 MQB Evo message map) carried over to `master`, where they are documented in `SUPERB_MK4.md` and
 `SUPERB_MK4_BEST_LATERAL.md`.
