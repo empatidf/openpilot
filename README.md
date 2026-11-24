@@ -67,12 +67,37 @@ The comma device and harness are not sold for this car by comma.ai; check fit an
 | Branch | What it is |
 |---|---|
 | **`master`** (use this) | comma.ai openpilot with the Superb Mk4 port |
+| `chestnut` | Newer comma.ai openpilot (the source of `nightly-chestnut`) with the same Superb Mk4 port, for use with the comma Chestnut GPU |
 | `sunnypilot` | Earlier port on a sunnypilot base; kept for reference, not developed further |
 
 The current code is the build confirmed on the car as the best working steering so far. Its parameters and
 the reasons behind them are in [`SUPERB_MK4_BEST_LATERAL.md`](SUPERB_MK4_BEST_LATERAL.md) (search for
 `BEST WORKING LATERAL MODEL`); [`SUPERB_MK4.md`](SUPERB_MK4.md) lists every change and how to update to newer
 comma.ai openpilot.
+
+### Using the comma Chestnut GPU (`chestnut` branch)
+
+[Chestnut](https://comma.ai/shop/chestnut) is comma's external GPU for the comma four. It runs a much larger
+driving model than the device can. comma ships it on `nightly-chestnut`, which is built from comma's `master`.
+The `chestnut` branch here is that same comma `master` merged with this port (the Superb Mk4 opendbc code and the
+steering changes), so the car steers with the big model:
+
+1. Plug in Chestnut as comma describes (USB-C to the device, 12 V power).
+2. Install `installer.comma.ai/empatidf/chestnut` (Settings > Software > Uninstall, then Custom Software), or
+   switch branch to `chestnut` under Settings > Software.
+3. The first start builds openpilot and downloads the big model (about 760 MB), so give it time on Wi-Fi.
+4. With Chestnut connected, openpilot loads the big model on its own; without it, it falls back to the normal
+   model. Chestnut alerts (not detected, overheated, power) show on the home screen as in comma's build.
+
+Notes:
+
+- `chestnut` follows comma's development code, which is newer and less tested than `master` here. If it
+  misbehaves, go back to `installer.comma.ai/empatidf/master`.
+- The opendbc submodule points at the `chestnut` branch of
+  [empatidf/opendbc](https://github.com/empatidf/opendbc/tree/chestnut), which is the same Superb port merged
+  with the opendbc version comma's `master` uses.
+- The steering tune was set on `master` with the normal model; the big model plans differently, so report how
+  it drives (routes with bookmarks help).
 
 ## What the port does
 
