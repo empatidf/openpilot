@@ -68,6 +68,7 @@ The comma device and harness are not sold for this car by comma.ai; check fit an
 |---|---|
 | **`master`** (use this) | comma.ai openpilot with the Superb Mk4 port |
 | `chestnut` | Newer comma.ai openpilot (the source of `nightly-chestnut`) with the same Superb Mk4 port, for use with the comma Chestnut GPU |
+| `chestnut-ta` (test) | `chestnut` plus openpilot's own Travel Assist status message, so openpilot steers alone without the rack's one-second release. Drive it with the car's Travel Assist switched off; see below |
 | `sunnypilot` | Earlier port on a sunnypilot base; kept for reference, not developed further |
 
 The current code is the build confirmed on the car as the best working steering so far. Its parameters and
@@ -99,6 +100,40 @@ Notes:
 - The steering tune was set on `master` with the normal model; the big model plans differently, so report how
   it drives (routes with bookmarks help).
 
+### Test branch `chestnut-ta`: openpilot steers alone
+
+**What was found.** Two things in the car decide how openpilot can steer (logs of 24 Nov 2026):
+
+- While the car's own Travel Assist is **active**, the car's lane centering sets where the car sits in the lane.
+  openpilot's sustained requests are not executed, and a position the driver steered to is kept (0.5 m right of
+  centre for 75 s after a 4 s push on the wheel).
+- While Travel Assist is **not active**, the rack ends every steering request after exactly 1.00 s and accepts
+  it again one frame later. In turns that is a jolt in the wheel and a pulse towards straight ahead once a second.
+
+**What this branch changes.**
+
+- openpilot re-sends the camera's Travel Assist status message (`TA_01`) and reports Travel Assist as active
+  while it steers, as comma's MEB port with openpilot longitudinal does. The frame is the one the camera itself
+  sends in that state on this car, byte for byte. The panda blocks the camera's copy and lets "active" through
+  only while openpilot is engaged.
+- While the car's own Travel Assist is not active, the steering command is no longer multiplied by the speed gain
+  table (it was measured with Travel Assist steering along).
+- When you steer, openpilot follows your steering and hands back over one second after you let go, instead of
+  holding its plan against you and swinging back on release. Lane changes are unchanged.
+
+**How to drive it.**
+
+1. Install `installer.comma.ai/empatidf/chestnut-ta`, or switch branch under Settings > Software.
+2. In the car, switch **Travel Assist off** and drive with ACC only. If the car's Travel Assist is active, the
+   branch behaves like `chestnut`.
+3. The instrument cluster may show Travel Assist as active while openpilot steers; that is the message above.
+4. First drive: an empty road, hands on the wheel, below about 100 km/h. Above that speed the steering gain is not
+   measured yet for this mode and the car may steer too little in curves.
+5. Bookmark anything odd and share the route. Go back with `installer.comma.ai/empatidf/chestnut`.
+
+Not verified on the car yet: that the rack keeps accepting openpilot continuously with this message, and that no
+other control unit objects to it.
+
 ## What the port does
 
 - Steering by curvature (`HCA_03`), tuned on this car over ~20 logged drives:
@@ -111,9 +146,13 @@ Notes:
 
 ## Open issues
 
-- **Keeps too close to the right lane line in town.** Cause not found yet.
-- **Short opposite-direction steering pulses in turns, at a regular rhythm.** Source not found yet; it is
-  most likely the car itself (the rack's once-per-second release), but the logs have not confirmed it.
+- **Keeps too close to the right lane line.** With the car's Travel Assist active, the car's own lane
+  centering holds the lane position and keeps a position the driver steered to; openpilot cannot pull it back.
+  The `chestnut-ta` test branch is the attempt to fix it. On unmarked town roads the driving model itself keeps
+  to the right and takes right-hand bends close to the kerb.
+- **Short opposite-direction steering pulses in turns, once a second.** Confirmed: with Travel Assist not
+  active the rack ends each steering request after 1.00 s and accepts it again one frame later. The
+  `chestnut-ta` test branch is the attempt to fix it.
 - **Sensors drop out briefly and openpilot disengages.** The car's assistance sensors go away for a moment,
   openpilot switches off, the sensors come back right after and openpilot can be engaged again. Not fixed;
   it is linked to a timing clash of CAN messages (openpilot's copy of the steering wheel's hands-on message
