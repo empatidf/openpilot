@@ -4,17 +4,63 @@ This `master` branch is built on **[comma.ai openpilot](https://github.com/comma
 steering support for the **Škoda Superb Mk4** (4th generation, 2024+, MQB Evo GEN2, chassis code `NZ`).
 openpilot steers; the car's own ACC keeps gas, brake and emergency braking.
 
-The car port lives in **[empatidf/opendbc](https://github.com/empatidf/opendbc)** (branch `master`), which is
-comma.ai's opendbc plus the Superb Mk4. Everything else is comma.ai openpilot.
-
 > **Experimental, not supported or reviewed by comma.ai.** Keep your hands on the wheel and be ready to
 > take over at any time. You use this software at your own risk.
 
-## Install
+## Where the code comes from
 
-`installer.comma.ai/empatidf/master`
+- **openpilot:** comma.ai openpilot, with small Volkswagen changes to the curvature controller
+  (`openpilot/selfdrive/controls`, see [`SUPERB_MK4.md`](SUPERB_MK4.md)).
+- **opendbc (car code):** the `opendbc_repo` submodule points at
+  [empatidf/opendbc](https://github.com/empatidf/opendbc) branch `master`. That is comma.ai opendbc plus the
+  Superb Mk4 port. **The MQB Evo message definitions (`_vw_mqbevo_common.dbc`, `vw_mqbevo_2024.dbc`, unchanged)
+  and the MQB Evo platform approach are taken from
+  [infiniteCable2/opendbc](https://github.com/infiniteCable2/opendbc)**; the Superb Mk4 platform, its tuning and
+  the fixes listed below were added on top.
 
-A device already installed from the old `op` branch: Settings → Software → target branch → `master`.
+## What you need
+
+| Item | Notes |
+|---|---|
+| Car | Škoda Superb Mk4 (2024+) with **ACC** and **Travel Assist**. Other MQB Evo cars are not supported by this port. |
+| comma device | **comma four** or **comma 3X**. The car uses CAN FD; older devices do not work. |
+| Harness | **VW C harness**: [xnor.shop/products/vw-c-harness](https://xnor.shop/products/vw-c-harness). It goes between the windscreen camera and its connector. |
+
+The comma device and harness are not sold for this car by comma.ai; check fit and plugs before you install.
+
+## Installation from scratch
+
+1. **Harness:** with the car off, open the cover around the windscreen camera (behind the rear-view mirror),
+   unplug the camera connector, and plug the VW C harness in between camera and car, following the harness
+   instructions. Connect the harness to the comma device and mount the device on the windscreen.
+2. **Software:** start the comma device. During setup choose **Custom Software** and enter:
+
+   `installer.comma.ai/empatidf/master`
+
+3. **First start:** switch the car on. openpilot reads the radar firmware to recognise the car (the VIN
+   cannot be read from the camera connector). The supported radar firmware is `1N3907567B` (ECU `0x757`).
+   If the device shows **"Car Unrecognized"** or dashcam mode, your car has different firmware: open an issue
+   with your route, the firmware can then be added.
+4. **Calibration:** drive above 24 km/h on straight roads until calibration reaches 100 % (a few minutes).
+   openpilot cannot engage before that.
+5. **Settings on the device:** make sure openpilot is enabled (Settings → Toggles). Uploading drives to
+   comma connect is recommended; logs are the only way to find problems.
+
+### Driving
+
+1. Turn on the car's **ACC** and engage the car's own **Travel Assist** (steering-wheel button, green
+   steering-wheel icon in the cluster). openpilot engages together with ACC and disengages when ACC
+   switches off; there is no steering without ACC.
+2. Keep Travel Assist engaged: without it the steering rack releases openpilot's request for a moment once
+   per second, and under load this can end in "LKAS Fault: Restart the Car" (a restart clears it).
+3. Lane changes: signal and nudge the wheel; openpilot changes lane.
+4. Keep your hands on the wheel. Braking, gas or a firm steering input overrides openpilot.
+
+### Updating and removing
+
+- The device updates by itself when the car is off and it has internet; Settings → Software checks by hand.
+  A device installed from the old `op` branch: Settings → Software → target branch → `master`.
+- To return the car to stock, unplug the harness and plug the camera connector back in.
 
 ## Branches
 
@@ -28,52 +74,37 @@ the reasons behind them are in [`SUPERB_MK4_BEST_LATERAL.md`](SUPERB_MK4_BEST_LA
 `BEST WORKING LATERAL MODEL`); [`SUPERB_MK4.md`](SUPERB_MK4.md) lists every change and how to update to newer
 comma.ai openpilot.
 
-## Requirements
-
-- comma four or comma 3X (the car uses CAN FD).
-- VW C / MFK-C camera harness at the windscreen camera.
-- The car is identified by its radar firmware (`1N3907567B`, ECU `0x757`); the VIN cannot be read from the
-  camera connector.
-
-## How to drive with it
-
-1. Turn on the car's ACC and engage the car's own **Travel Assist** (steering-wheel button, green
-   steering-wheel icon in the cluster). openpilot engages together with ACC.
-2. With Travel Assist engaged the steering rack does not release once per second, and the "LKAS Fault"
-   seen in earlier versions has not occurred in the logged drives.
-3. Lane changes: signal and nudge the wheel; openpilot changes lane.
-
 ## What the port does
 
-- Steering by curvature (`HCA_03`), with tuning measured on this car over ~20 logged drives:
+- Steering by curvature (`HCA_03`), tuned on this car over ~20 logged drives:
   - speed-dependent gain on the command (the rack carries out less of the command above ~100 km/h),
   - a smoothed command at speed, filtered before the legal acceleration/jerk limits,
   - a gentle feedback controller (low proportional gain against highway weave; an integrator that is kept
     through wheel nudges, frozen during lane changes and bled off while Travel Assist steers).
-- Stock ACC stays in charge of speed. Short Front Assist warning phases in dense traffic
-  (`AWV_03.AWV_Unavailable` for 0.1–2 s) no longer count as a cruise fault.
+- Stock ACC stays in charge of speed. Short Front Assist warning phases in dense traffic no longer count as a
+  cruise fault.
 
 ## Open issues
 
-- **Rack releases once per second without Travel Assist.** When the car's Travel Assist is not engaged,
-  the rack drops openpilot's steering request for 10–20 ms every second (felt as a small ping). Under load
-  with the driver steering, such a release can end in "LKAS Fault: Restart the Car". This also happens
-  during lane changes, because Travel Assist pauses for about 3–8 s when you signal.
-- **With Travel Assist engaged, the car's own lane centering does most of the steering.** The rack follows
-  only a small part of openpilot's corrections; openpilot steers alone when Travel Assist pauses, e.g.
-  during lane changes.
-- **Rare stock-ACC shut-off at standstill.** Once in a while the car's ACC switches itself off after a few
-  seconds at a stop (reversible fault with a warning sound) and openpilot disengages with it. The likely
-  cause is openpilot's second copy of the steering wheel's hands-on message (`KLR_01`) colliding with the
-  car's own frame on the car-side bus. A fix was tested and is reverted for now, because the build without
-  it drove more reliably; still under investigation.
-- **Car errors at some ignitions.** On some start-ups the car shows several assistance-system errors. The
-  panda's camera-side bus records bus-off errors around ignition on/off, never while driving. Not solved.
-- **Small steering-wheel dither below ~15 km/h** comes from the driving model's plan; a fine 10–17 Hz buzz
-  felt in some curves is generated inside the rack.
-- **No openpilot longitudinal control.** The radar sits on the car-side bus, outside the camera harness, so
-  its acceleration requests cannot be replaced without silencing the whole ADAS unit (which also removes
-  emergency braking and Travel Assist). A gateway (J533) harness could make it possible; not tried.
+- **Keeps too close to the right lane line in town.** Cause not found yet.
+- **Short opposite-direction steering pulses in turns, at a regular rhythm.** Source not found yet; it is
+  most likely the car itself (the rack's once-per-second release), but the logs have not confirmed it.
+- **Sensors drop out briefly and openpilot disengages.** The car's assistance sensors go away for a moment,
+  openpilot switches off, the sensors come back right after and openpilot can be engaged again. Not fixed;
+  it is linked to a timing clash of CAN messages (openpilot's copy of the steering wheel's hands-on message
+  `KLR_01` colliding with the car's own frame).
+- **Sensors missing after a short stop.** When the car is switched off for a short break and started again,
+  the assistance sensors sometimes do not come up, and the car has to be switched off and on once more. Not
+  fixed.
+- **Small left-right steering oscillation at low speed.** Will be addressed in coming versions.
+
+### Limitations
+
+- With Travel Assist engaged, the car's own lane centering does most of the steering; openpilot steers alone
+  when Travel Assist pauses, e.g. during lane changes (Travel Assist pauses for about 3–8 s when you signal).
+- No openpilot longitudinal control: the radar sits on the car-side bus, outside the camera harness, so its
+  acceleration requests cannot be replaced without silencing the whole ADAS unit (which also removes
+  emergency braking and Travel Assist).
 
 ## License
 
